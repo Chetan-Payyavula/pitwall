@@ -1,0 +1,40 @@
+{
+ "years": {
+  "2024": [
+   {
+    "round": 16,
+    "name": "Italian Grand Prix",
+    "sessions": [
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 24,
+    "name": "Abu Dhabi Grand Prix",
+    "sessions": [
+     "Qualifying"
+    ]
+   }
+  ],
+  "2026": [
+   {
+    "round": 16,
+    "name": "Bahrain Grand Prix",
+    "sessions": [
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 17,
+    "name": "Singapore Grand Prix",
+    "sessions": [
+     "Sprint Qualifying",
+     "Qualifying",
+     "Race"
+    ]
+   }
+  ]
+ }
+}
