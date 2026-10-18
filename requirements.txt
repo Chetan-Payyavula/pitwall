@@ -1,0 +1,8 @@
+fastf1>=3.4
+fastapi>=0.110
+uvicorn[standard]>=0.29
+numpy
+pandas
+# tests
+pytest
+httpx
