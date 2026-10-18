@@ -479,6 +479,7 @@ tr:hover td { background: rgba(255,255,255,.025); }
 .tw-head, .tw-row { display: grid; grid-template-columns: 26px 1fr 66px 50px 74px 46px 32px; align-items: center; gap: 4px; }
 .tw-head { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; padding: 0 6px 6px; border-bottom: 1px solid var(--line); }
 .tw-head span:nth-child(n+3), .tw-row > span:nth-child(n+3) { text-align: right; }
+@media (max-width: 480px) { .tw-head, .tw-row { grid-template-columns: 22px minmax(0, 1fr) 58px 44px 64px 40px 26px; gap: 2px; } .tw-row { font-size: 12px; } }
 .tw-body { position: relative; }
 .tw-row { position: absolute; left: 0; right: 0; top: 0; height: 32px; padding: 0 6px; border-radius: 6px; cursor: pointer; transition: transform .7s var(--ease), background .2s; font-family: var(--mono); }
 .tw-row:hover { background: rgba(255,255,255,.04); }
@@ -505,7 +506,7 @@ tr:hover td { background: rgba(255,255,255,.025); }
 .rc.green { border-color: #2bd96b; } .rc.track-limits { border-color: #ffd400; } .rc.penalty { border-color: #ff5a5a; } .rc.chequered { border-color: #fff; }
 .rc.blue { border-color: #2f7ff7; } .rc.incident { border-color: #b26bff; }
 /* driver dashboards */
-.pw-dash { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.pw-dash { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 16px; margin-bottom: 16px; }
 .dash { background: linear-gradient(150deg, color-mix(in srgb, var(--c) 18%, #12151c), #0f1217 60%); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; position: relative; overflow: hidden; }
 .dash::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--c); box-shadow: 0 0 16px var(--c); }
 .ds-head { display: flex; align-items: baseline; gap: 12px; }

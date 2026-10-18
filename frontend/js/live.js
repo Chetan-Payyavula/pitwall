@@ -2,7 +2,7 @@
    strategy (tyre deg, pit loss, rejoin, undercut/overcut, pit window, ERS est.).
    Works on three sources: built-in demo race, FastF1 replay of a past race,
    OpenF1 live. Replay/demo run on a local clock the user can play/scrub. */
-import { $, state, api, toast, showLoading, hideLoading, esc, fmtLap, fmtGap, clamp, TYRE, PURPLE, GREEN,
+import { $, state, STATIC, api, toast, showLoading, hideLoading, esc, fmtLap, fmtGap, clamp, TYRE, PURPLE, GREEN,
   PLOT_BASE, PLOT_CFG, axis, axisTitle, mix } from "./util.js";
 
 const L = {
@@ -51,6 +51,7 @@ export async function showLive(visible) {
   const rb = $("pw-source").querySelector('[data-v="replay"]');
   rb.disabled = state.year === "0";
   rb.title = rb.disabled ? "Pick a season and race in the top bar first" : `Replay ${state.schedule.find((e) => String(e.round) === String(state.event))?.name || "the selected race"}`;
+  await staticReplayButton();
   if (!visible) { cancelAnimationFrame(L.raf); L.raf = 0; return; }
   if (!L.meta) await setSource(L.source);
   if (!L.raf) { L.lastFrame = performance.now(); L.raf = requestAnimationFrame(frame); }
@@ -61,6 +62,19 @@ export function liveSelectionChanged() {
   if (L.source === "replay") { L.meta = null; if (L.visible) setSource("replay"); }
   const rb = $("pw-source").querySelector('[data-v="replay"]');
   if (rb) rb.disabled = state.year === "0";
+  staticReplayButton();
+}
+
+/** Online build: only some events have a recorded race; live OpenF1 timing needs the Python server. */
+async function staticReplayButton() {
+  if (!STATIC) return;
+  const src = $("pw-source");
+  const of = src.querySelector('[data-v="openf1"]');
+  of.disabled = true; of.title = "Live timing needs the Python server version (see the README on GitHub)";
+  const rb = src.querySelector('[data-v="replay"]');
+  if (state.year === "0") return;
+  const { hasRace } = await import("./static-api.js");
+  if (!(await hasRace(state.year, state.event))) { rb.disabled = true; rb.title = "No recorded race for this event in the online version"; }
 }
 
 async function setSource(src) {
@@ -71,7 +85,8 @@ async function setSource(src) {
   const p = srcParams();
   const seq = (L.srcSeq = (L.srcSeq || 0) + 1);
   const overlay = src === "replay";
-  if (overlay) showLoading("Loading the full race for replay… the first time can take 1–2 minutes while FastF1 downloads every car's telemetry.");
+  if (overlay) showLoading(STATIC ? "Loading the full race for replay (about 6 MB)…"
+    : "Loading the full race for replay… the first time can take 1–2 minutes while FastF1 downloads every car's telemetry.");
   let meta;
   try {
     meta = await api("live/meta", p);

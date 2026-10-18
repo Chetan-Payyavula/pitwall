@@ -1,6 +1,6 @@
 /* App shell: session pickers, driver selection, tabs, data loading, URL state. */
 import {
-  $, state, DEMO, MAX_DRIVERS, api, on, toast, showLoading, hideLoading, assignColors, colorOf, esc, fmtLap,
+  $, state, DEMO, MAX_DRIVERS, STATIC, api, on, toast, showLoading, hideLoading, assignColors, colorOf, esc, fmtLap,
 } from "./util.js";
 import { playIntro } from "./intro.js";
 import * as C from "./charts.js";
@@ -84,10 +84,16 @@ function renderTab(tab) {
 const resizePlots = (tab) => document.querySelectorAll(`[data-panel="${tab}"] .js-plotly-plot`).forEach((p) => safe("resize", () => Plotly.Plots.resize(p)));
 
 // ------------------------------------------------------------------ pickers
-function fillYears() {
+async function fillYears() {
   const sel = $("year"), now = new Date().getFullYear();
-  sel.innerHTML = `<option value="${DEMO}">Demo (offline)</option>` +
-    Array.from({ length: now - 2018 + 1 }, (_, i) => now - i).map((y) => `<option value="${y}">${y}</option>`).join("");
+  let years = Array.from({ length: now - 2018 + 1 }, (_, i) => now - i);
+  if (STATIC) {
+    const { getManifest, startEngine } = await import("./static-api.js");
+    startEngine();                                    // warm up the in-browser Python while the session table loads
+    try { years = Object.keys((await getManifest()).years).map(Number).sort((a, b) => b - a); } catch (e) { toast(e.message); }
+    if (!new URLSearchParams(location.search).get("year") && years.length) state.year = String(years[0]);
+  }
+  sel.innerHTML = `<option value="${DEMO}">Demo (offline)</option>` + years.map((y) => `<option value="${y}">${y}</option>`).join("");
   sel.value = state.year;
   if (sel.value !== state.year) { state.year = DEMO; sel.value = DEMO; }
 }
@@ -152,7 +158,8 @@ async function loadOverview() {
   busy.overview = true;
   renderDriverList();
   setTab(state.tab);
-  showLoading(state.year === DEMO ? "Loading the demo session…" : `Loading ${state.session}… the first time can take 30–60 s while FastF1 downloads the session.`);
+  showLoading(state.year === DEMO ? "Loading the demo session…" : STATIC ? `Loading ${state.session}…`
+    : `Loading ${state.session}… the first time can take 30–60 s while FastF1 downloads the session.`);
   let ov = null;
   try { ov = await api("overview", { year: state.year, event: state.event, session: state.session }); }
   catch (e) { if (seq === ovSeq) toast(e.message); }
@@ -213,7 +220,8 @@ function renderDriverList() {
 
   $("selected").innerHTML = state.selected.map((s, i) => {
     const d = driverRow(s.code);
-    const laps = (d?.laps || []).filter((l) => l.time != null);
+    // the online build bakes each driver's fastest lap only
+    const laps = STATIC && state.year !== DEMO ? [] : (d?.laps || []).filter((l) => l.time != null);
     const opts = [`<option value="fastest">fastest${d?.best_str ? ` · ${d.best_str}` : ""}</option>`]
       .concat(laps.map((l) => `<option value="${l.lap}">lap ${l.lap} · ${fmtLap(l.time)}${l.deleted ? " (deleted)" : ""}${l.lap === d.best_lap ? " ★" : ""}</option>`));
     return `<span class="sel"><b style="color:${colorOf(s.code)}">${s.code}</b>${i === 0 ? " (ref)" : ""}<select data-code="${s.code}">${opts.join("")}</select></span>`;
@@ -284,7 +292,7 @@ async function compare(ev) {
 // ------------------------------------------------------------------ boot
 async function boot() {
   readUrl();
-  fillYears();
+  await fillYears();
   $("year").addEventListener("change", () => { state.selected = []; onYear(); });
   // lap numbers mean nothing in another session: keep the drivers, go back to their fastest laps
   const resetLaps = () => state.selected.forEach((s) => { s.lap = "fastest"; });

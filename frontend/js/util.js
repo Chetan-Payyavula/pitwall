@@ -3,6 +3,8 @@
 export const $ = (id) => document.getElementById(id);
 export const DEMO = "0";
 export const MAX_DRIVERS = 4;
+/** True on the serverless (GitHub Pages) build: baked sessions + the backend Python running in the browser. */
+export const STATIC = typeof window !== "undefined" && !!window.PITWALL_STATIC;
 
 export const state = {
   year: DEMO,
@@ -28,6 +30,7 @@ export const on = (name, fn) => bus.addEventListener(name, (e) => fn(e.detail));
 
 // ------------------------------------------------------------------ network
 export async function api(path, params) {
+  if (STATIC) return (await import("./static-api.js")).staticApi(path, params);
   const res = await fetch(`/api/${path}?${new URLSearchParams(params)}`);
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : `Request failed (${res.status})`);

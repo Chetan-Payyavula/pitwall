@@ -9,6 +9,10 @@ braking-zone table, speed map and track-dominance map. Data comes from the
 official F1 live-timing feed through [FastF1](https://docs.fastf1.dev)
 (2018 season onwards).
 
+**Try it online: [chetan-payyavula.github.io/pitwall](https://chetan-payyavula.github.io/pitwall/)** (no install).
+The online version has 8 recorded sessions from 2024 and 2026 and each driver's fastest lap,
+and runs the same Python analysis code in your browser. Run it locally (below) for any session, any lap and live timing.
+
 ## Run it
 
 ```bash
@@ -25,6 +29,28 @@ first load of a session takes 30–60 s while FastF1 downloads it; after that it
 is cached in `cache/` and loads in a second or two.
 
 Run the tests with `pytest`.
+
+## Online version (GitHub Pages, no server)
+
+The `gh-pages` branch is a static build of the same app:
+
+- Sessions are baked from the FastF1 cache into JSON (`tools/bake_static.py`): the session table,
+  every driver's fastest-lap telemetry and, for races, the full replay data
+  (car channels and session times stored losslessly; map positions as float32, under 1 mm error).
+- `backend/service.py` holds the API logic shared by the server and the static build. In the browser it runs
+  in a Web Worker on [Pyodide](https://pyodide.org) (Python + numpy + pandas compiled to WebAssembly), so lap
+  comparisons are computed by the same code as the server.
+- `tools/check_static.py` checks that the baked path gives the same answers as FastF1 (143 checks, all identical).
+  In the browser, lap comparisons, session data and replay timing match exactly; the strategy model's fits can
+  differ in the last rounded digit because Pyodide ships an older numpy.
+
+Rebuild it:
+
+```bash
+F1_CACHE_DIR=cache python -m tools.bake_static site-data
+F1_CACHE_DIR=cache python -m tools.check_static site-data
+python -m tools.build_static_site site-data site      # then publish site/ to the gh-pages branch
+```
 
 ## What's inside
 
@@ -57,6 +83,8 @@ Run the tests with `pytest`.
 ```
 backend/
   main.py      FastAPI app: /api/schedule, /api/overview, /api/drivers, /api/compare + serves frontend/
+  service.py   the API logic (compare, pit wall) shared by the server and the in-browser build
+  static_data.py bake sessions to files, and read them back without FastF1 (online version)
   data.py      FastF1 loading (cached), drivers, lap telemetry, circuit corners, session overview
   analysis.py  pure maths: lap delta, braking zones, mini-sector dominance, g-forces, corner analysis
   demo.py      synthetic circuit with elevation, lap-time-sim speed profiles, race simulation
@@ -73,8 +101,10 @@ frontend/
   js/corners.js   corner coverflow + braking table
   js/session.js   classification, traps, race charts
   js/live.js      Pit Wall tab
+  js/static-api.js, js/static-worker.js  online version: answers the API from baked files + Pyodide
   vendor/         plotly, three.js, OrbitControls (no CDN, no build step)
 tests/         analysis maths, API, and the FastF1 code path with a fake session
+tools/         bake, check and build the online version
 ```
 
 **Lap delta** — both laps are interpolated onto a shared 5 m distance grid and

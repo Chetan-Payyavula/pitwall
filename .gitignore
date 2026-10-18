@@ -2,7 +2,6 @@
 cache/
 __pycache__/
 .pytest_cache/
-tools/
 share-log*.txt
 PUBLIC-LINK.txt
 setup-log.txt

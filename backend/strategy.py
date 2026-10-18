@@ -36,7 +36,9 @@ TRAFFIC_GAP = 1.0             # s — rejoining closer than this to a car ahead 
 def _clean(history: list[dict]) -> list[dict]:
     by = defaultdict(list)
     for r in history:
-        if r["lap"] > 1 and not r["neutral"] and not r["pit_in"] and not r["pit_out"] and r["time"] and r.get("compound"):
+        # laps without a recorded tyre age can't go into the degradation fit (a NaN would break it)
+        if (r["lap"] > 1 and not r["neutral"] and not r["pit_in"] and not r["pit_out"] and r["time"] and r.get("compound")
+                and r.get("age") is not None and np.isfinite(r["age"]) and np.isfinite(r["time"])):
             by[r["code"]].append(r)
     out = []
     for rows in by.values():
