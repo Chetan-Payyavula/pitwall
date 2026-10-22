@@ -170,9 +170,10 @@ async function loadOverview() {
   const drivers = ov?.drivers || [];
   state.colors = assignColors(drivers);               // official order: the higher-placed teammate keeps the team colour
   const codes = new Set(drivers.map((d) => d.code));
-  state.selected = state.selected.filter((s) => codes.has(s.code) && (s.lap === "fastest" || lapRow(s.code, s.lap)));
+  const noTel = new Set(drivers.filter((d) => d.no_telemetry).map((d) => d.code));
+  state.selected = state.selected.filter((s) => codes.has(s.code) && !noTel.has(s.code) && (s.lap === "fastest" || lapRow(s.code, s.lap)));
   if (!state.selected.length) {
-    const ranked = drivers.filter((d) => d.best != null).sort((a, b) => a.best - b.best);
+    const ranked = drivers.filter((d) => d.best != null && !d.no_telemetry).sort((a, b) => a.best - b.best);
     const first = ranked[0], second = ranked.find((d) => d !== first && d.team !== first?.team) || ranked[1];
     state.selected = [first, second].filter(Boolean).map((d) => ({ code: d.code, lap: "fastest" }));
   }
@@ -210,7 +211,7 @@ function renderDriverList() {
   list.innerHTML = drivers.map((d) => {
     const i = state.selected.findIndex((s) => s.code === d.code);
     const pos = classified ? (d.position != null && /^\d+$/.test(d.classified || String(d.position)) ? `P${d.classified || d.position}` : (d.classified || "—")) : "";
-    return `<button type="button" class="chip ${i >= 0 ? "on" : ""}" data-code="${d.code}" style="--c:${colorOf(d.code)}" title="${esc(d.name)} — ${esc(d.team)}${d.best_str ? ` · best ${d.best_str}` : ""}">
+    return `<button type="button" class="chip ${i >= 0 ? "on" : ""}${d.no_telemetry ? " nodata" : ""}" data-code="${d.code}" style="--c:${colorOf(d.code)}" title="${esc(d.name)} — ${esc(d.team)}${d.best_str ? ` · best ${d.best_str}` : ""}${d.no_telemetry ? " · telemetry incomplete in the source data" : ""}">
       <span class="bar" style="background:${colorOf(d.code)}"></span>
       ${i >= 0 ? `<span class="ord">${i === 0 ? "REF" : i + 1}</span>` : ""}
       ${classified ? `<span class="pos ${/^P/.test(pos) ? "" : "out"}">${esc(pos)}</span>` : ""}
@@ -244,8 +245,10 @@ function selectionChanged() {
 }
 
 function toggleDriver(code) {
-  if (!driverRow(code)) return;
+  const row = driverRow(code);
+  if (!row) return;
   const i = state.selected.findIndex((s) => s.code === code);
+  if (i < 0 && row.no_telemetry) { toast(`${code}'s car telemetry for this session is incomplete in the source data, so it can't be compared.`); return; }
   if (i >= 0) state.selected.splice(i, 1);
   else if (state.selected.length < MAX_DRIVERS) state.selected.push({ code, lap: "fastest" });
   else { toast(`Up to ${MAX_DRIVERS} drivers — remove one first.`); return; }

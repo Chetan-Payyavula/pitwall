@@ -19,6 +19,136 @@
   ],
   "2026": [
    {
+    "round": 1,
+    "name": "Australian Grand Prix",
+    "sessions": [
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 2,
+    "name": "Chinese Grand Prix",
+    "sessions": [
+     "Sprint Qualifying",
+     "Sprint",
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 3,
+    "name": "Japanese Grand Prix",
+    "sessions": [
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 4,
+    "name": "Miami Grand Prix",
+    "sessions": [
+     "Sprint Qualifying",
+     "Sprint",
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 5,
+    "name": "Canadian Grand Prix",
+    "sessions": [
+     "Sprint Qualifying",
+     "Sprint",
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 6,
+    "name": "Monaco Grand Prix",
+    "sessions": [
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 7,
+    "name": "Barcelona Grand Prix",
+    "sessions": [
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 8,
+    "name": "Austrian Grand Prix",
+    "sessions": [
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 9,
+    "name": "British Grand Prix",
+    "sessions": [
+     "Sprint Qualifying",
+     "Sprint",
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 10,
+    "name": "Belgian Grand Prix",
+    "sessions": [
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 11,
+    "name": "Hungarian Grand Prix",
+    "sessions": [
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 12,
+    "name": "Dutch Grand Prix",
+    "sessions": [
+     "Sprint Qualifying",
+     "Sprint",
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 13,
+    "name": "Italian Grand Prix",
+    "sessions": [
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 14,
+    "name": "Spanish Grand Prix",
+    "sessions": [
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
+    "round": 15,
+    "name": "Azerbaijan Grand Prix",
+    "sessions": [
+     "Qualifying",
+     "Race"
+    ]
+   },
+   {
     "round": 16,
     "name": "Bahrain Grand Prix",
     "sessions": [
@@ -31,6 +161,7 @@
     "name": "Singapore Grand Prix",
     "sessions": [
      "Sprint Qualifying",
+     "Sprint",
      "Qualifying",
      "Race"
     ]

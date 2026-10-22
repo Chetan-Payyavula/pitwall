@@ -42,14 +42,103 @@ def time_at(lap: pd.DataFrame, distance: np.ndarray) -> np.ndarray:
 # --------------------------------------------------------------------------- #
 
 
+def _scale_distance(d: np.ndarray, r0: float, r1: float) -> np.ndarray:
+    d0, d1 = np.nanmin(d), np.nanmax(d)
+    return r0 + (d - d0) * (r1 - r0) / (d1 - d0) if d1 - d0 > 0 else d
+
+
+def _project_distance(lap: pd.DataFrame, ref: pd.DataFrame, window: float = 80.0) -> np.ndarray | None:
+    """Distance of each `lap` sample = where its X/Y lies along the reference lap's path.
+
+    Searches only near the expected place (within `window` metres of the scaled estimate) and penalises
+    matches far from it, so a point near a hairpin or a parallel stretch can't snap to the other leg.
+    """
+    if not {"X", "Y"}.issubset(lap.columns) or not {"X", "Y"}.issubset(ref.columns):
+        return None
+    rd = ref["Distance"].to_numpy(float)
+    r0, r1 = float(rd.min()), float(rd.max())
+    grid = np.arange(r0, r1 + 0.5, 1.0)                                   # reference path every metre
+    gx = np.interp(grid, rd, ref["X"].to_numpy(float))
+    gy = np.interp(grid, rd, ref["Y"].to_numpy(float))
+    x, y = lap["X"].to_numpy(float), lap["Y"].to_numpy(float)
+    est = _scale_distance(lap["Distance"].to_numpy(float), r0, r1)
+    if not (np.isfinite(x).all() and np.isfinite(y).all() and np.isfinite(gx).all()):
+        return None
+    out = np.empty(len(x))
+    lo = np.searchsorted(grid, est - window)
+    hi = np.searchsorted(grid, est + window)
+    units = float(np.hypot(np.diff(gx), np.diff(gy)).sum()) / max(r1 - r0, 1.0)   # position units per metre
+    w = 0.1 * units                                  # 1 m away from the estimate costs like 0.1 m off the line
+    resid = np.empty(len(x))
+    for i in range(len(x)):
+        a, b = lo[i], max(hi[i], lo[i] + 1)
+        cost = (gx[a:b] - x[i]) ** 2 + (gy[a:b] - y[i]) ** 2 + (w * (grid[a:b] - est[i])) ** 2
+        k = a + int(np.argmin(cost))
+        out[i] = grid[k]
+        resid[i] = np.hypot(gx[k] - x[i], gy[k] - y[i]) / units          # metres off the reference path
+    # positions are in the source's units (FastF1: decimetres, demo: metres): only the matching uses them
+    # Use the projection to correct the slow drift of the speed-integrated distance only: a robust running
+    # median of (projected − estimated) over ~31 samples rejects a stretch of position data matched to the
+    # wrong part of the track, while still removing the shift a single bad speed sample leaves behind.
+    # a sample > 15 m off the reference path can't be placed on it (a position gap in either lap draws a
+    # chord across a corner): it keeps the speed-based estimate, i.e. the correction is interpolated there
+    # positions that run backwards along the path (a time-shifted chunk in the position feed) can't be trusted
+    # either: anything more than 5 m behind the furthest point reached so far keeps the estimate too
+    behind = out < np.maximum.accumulate(out) - 5.0
+    # and the speed-based distance only drifts by metres: a correction > 25 m away from the lap's typical
+    # one means the positions themselves are off (e.g. a lagging stretch of the feed), not the distance
+    raw_corr = out - est
+    typical = float(np.median(raw_corr[(resid <= 15.0) & ~behind])) if ((resid <= 15.0) & ~behind).any() else 0.0
+    trust = (resid <= 15.0) & ~behind & (np.abs(raw_corr - typical) <= 25.0)
+    corr = pd.Series(np.where(trust, out - est, np.nan)).interpolate(limit_direction="both").fillna(0.0)
+    corr = corr.rolling(31, center=True, min_periods=1).median()
+    out = est + corr.rolling(11, center=True, min_periods=1).mean().to_numpy()
+    # laps start and end on the timing line: map the first sample to r0 and the last to r1 and keep the
+    # distance strictly increasing, so no sample is dropped as a duplicate (that would move the lap's end time)
+    out = np.maximum.accumulate(np.clip(out, r0, r1)) + 1e-3 * np.arange(len(out))
+    out = r0 + (out - out[0]) * (r1 - r0) / (out[-1] - out[0])
+    return out
+
+
+def align_distance(lap: pd.DataFrame, ref: pd.DataFrame) -> pd.DataFrame:
+    """Put `lap` on the reference lap's distance scale.
+
+    Each lap's distance is integrated from its own speed trace, so laps of the same track end a few
+    metres apart, and one bad speed sample shifts everything after it. Where both laps have positions,
+    each sample is placed at the nearest point of the reference lap's path, so a corner is at the same
+    distance for every driver; otherwise the lap is stretched to the reference length. Either way the
+    lap starts and ends where the reference does, so the time delta ends exactly at the lap-time gap.
+    """
+    out = lap.copy()
+    r = ref["Distance"].to_numpy(float)
+    proj = _project_distance(out, ref)
+    out["Distance"] = proj if proj is not None else _scale_distance(out["Distance"].to_numpy(float), np.nanmin(r), np.nanmax(r))
+    return out
+
+
+def _smooth_delta(y: np.ndarray, w: int = 5) -> np.ndarray:
+    """Centred moving average that keeps both end values exact (removes ±10 ms sampling ripple)."""
+    if len(y) <= w:
+        return y
+    k = w // 2
+    out = np.convolve(np.pad(y, k, mode="edge"), np.ones(w) / w, mode="valid")
+    out[0], out[-1] = y[0], y[-1]
+    return out
+
+
 def lap_delta(ref: pd.DataFrame, cmp: pd.DataFrame, step: float = 5.0) -> dict:
     """Cumulative time gap of `cmp` relative to `ref` along the lap.
 
-    Positive delta → `cmp` is behind (slower) at that point.
+    Positive delta → `cmp` is behind (slower) at that point. Both laps are mapped onto the
+    reference lap's distance (see align_distance), so the last value is the lap-time gap.
     """
-    ref, cmp = clean_lap(ref), clean_lap(cmp)
-    grid = common_grid([ref, cmp], step)
-    delta = time_at(cmp, grid) - time_at(ref, grid)
+    ref = clean_lap(ref)
+    cmp = clean_lap(align_distance(cmp, ref))
+    r0, r1 = float(ref["Distance"].min()), float(ref["Distance"].max())
+    grid = np.arange(r0, r1, step)
+    if grid[-1] < r1:
+        grid = np.append(grid, r1)
+    delta = _smooth_delta(time_at(cmp, grid) - time_at(ref, grid))
     return {"distance": grid.round(1).tolist(), "delta": np.round(delta, 3).tolist()}
 
 

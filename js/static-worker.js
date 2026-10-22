@@ -42,7 +42,7 @@ const status = (text) => postMessage({ status: text });
 
 function boot() {
   return (booting ||= (async () => {
-    status("Starting the analysis engine (first visit only)…");
+    status("Starting the analysis engine…");
     importScripts(cfg.pyodide + "pyodide.js");
     py = await loadPyodide({ indexURL: cfg.pyodide });
     status("Loading numpy and pandas…");

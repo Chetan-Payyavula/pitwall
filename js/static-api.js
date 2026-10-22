@@ -61,7 +61,7 @@ async function call(fn, args, files = []) {
   startEngine();
   if (bootError) throw new Error(`The analysis engine couldn't start (${bootError}). Check your connection and reload.`);
   const cold = !ready;
-  if (cold) showLoading(statusText || "Starting the analysis engine (first visit only)…");
+  if (cold) showLoading(statusText || "Starting the analysis engine…");
   try {
     return await new Promise((resolve, reject) => {
       const id = ++seq;
