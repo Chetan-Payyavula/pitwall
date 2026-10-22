@@ -18,8 +18,8 @@ def straight_lap(speed_kmh, length=1000, step=5.0):
 def test_delta_constant_speeds():
     ref, slow = straight_lap(360), straight_lap(300)  # 100 m/s vs 83.3 m/s
     out = lap_delta(ref, slow)
-    # at 995 m: 995/83.333 - 995/100
-    assert out["delta"][-1] == pytest.approx(995 / (300 / 3.6) - 995 / 100, abs=1e-3)
+    # the delta runs to the end of the lap: 1000/83.333 - 1000/100
+    assert out["delta"][-1] == pytest.approx(1000 / (300 / 3.6) - 1000 / 100, abs=1e-3)
     assert all(np.diff(out["delta"]) >= 0)  # slower car only loses time
 
 
@@ -32,7 +32,16 @@ def test_delta_of_identical_laps_is_zero():
 def test_delta_matches_lap_time_gap():
     a, b = demo_lap("ALO"), demo_lap("NOR")
     end = lap_delta(a, b)["delta"][-1]
-    assert end == pytest.approx(demo_lap_time("NOR") - demo_lap_time("ALO"), abs=0.02)
+    assert end == pytest.approx(demo_lap_time("NOR") - demo_lap_time("ALO"), abs=0.002)
+
+
+def test_delta_ends_at_lap_gap_when_lap_lengths_differ():
+    # same track, but the slower lap's integrated distance came out 2% long (different line / drift)
+    ref = straight_lap(360, length=1000)
+    slow = straight_lap(300, length=1000)
+    slow["Distance"] = slow["Distance"] * 1.02
+    end = lap_delta(ref, slow)["delta"][-1]
+    assert end == pytest.approx(slow["Time"].iloc[-1] - ref["Time"].iloc[-1], abs=1e-3)
 
 
 def test_braking_zone_detection():

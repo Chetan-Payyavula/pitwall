@@ -10,8 +10,15 @@ official F1 live-timing feed through [FastF1](https://docs.fastf1.dev)
 (2018 season onwards).
 
 **Try it online: [chetan-payyavula.github.io/pitwall](https://chetan-payyavula.github.io/pitwall/)** (no install).
-The online version has 8 recorded sessions from 2024 and 2026 and each driver's fastest lap,
-and runs the same Python analysis code in your browser. Run it locally (below) for any session, any lap and live timing.
+The online version has every 2026 qualifying, sprint and race so far (plus three 2024 sessions) with each
+driver's fastest lap, and runs the same Python analysis code in your browser. Run it locally (below) for any
+session, any lap and live timing.
+
+> **Data note (October 2026).** Since about 15 October 2026 F1's live-timing archive, which FastF1 reads,
+> answers 401 unless you log in with an F1 TV subscription
+> ([FastF1 #978](https://github.com/theOehrly/Fast-F1/issues/978)). Sessions already in your FastF1 cache
+> still load. The online version's 2026 data therefore comes from [OpenF1](https://openf1.org) (free, same
+> timing and car feed) with the official classification from [Jolpica](https://github.com/jolpica/jolpica-f1).
 
 ## Run it
 
@@ -34,9 +41,31 @@ Run the tests with `pytest`.
 
 The `gh-pages` branch is a static build of the same app:
 
-- Sessions are baked from the FastF1 cache into JSON (`tools/bake_static.py`): the session table,
-  every driver's fastest-lap telemetry and, for races, the full replay data
-  (car channels and session times stored losslessly; map positions as float32, under 1 mm error).
+- Sessions are baked into JSON: the session table, every driver's fastest-lap telemetry and, for races and
+  sprints, the full replay data (car channels and session times stored losslessly; map positions as float32,
+  under 1 mm error). 2024 sessions come from the FastF1 cache (`tools/bake_static.py`); 2026 sessions from
+  OpenF1 (`tools/openf1_fetch.py` downloads, `backend/openf1_hist.py` converts, `tools/bake_openf1.py` bakes).
+- The OpenF1 converter reproduces FastF1's outputs: on the sessions both sources have (Kuala Lumpur and
+  Singapore 2026), the classification, Q1–Q3 times, best laps, sector bests, speed traps, weather and lap
+  times are identical (`tools/check_openf1.py`). On top of the raw feed it:
+  - snaps each lap's start to the moment the car crosses the timing line (OpenF1's lap starts can be 10–35 m
+    off), keeping the official lap time, so every lap starts within a metre of the line;
+  - places pit stops by their pit-lane entry time, and starts a new tyre stint at every stop (OpenF1's stint
+    list sometimes opens a phantom stint on lap 2); where a FastF1 bake of the same session exists, its
+    official tyre and position data is used instead;
+  - takes the timing line from the event's qualifying session when a race's own estimate is off, and removes
+    stretches where a race's position feed runs seconds behind the lap clock (Hungary 2026: ~3 s from lap 16);
+  - checks every fastest lap's car data and positions. Where the car data is broken (the feed stalls,
+    holding speed and RPM for > 3 s, the lap distance is > 1.5% off the track length, or the
+    car data doesn't reach the sector lines at the official sector times), the next fastest clean lap is shown and its
+    card says so. Where only the positions are missing (Monaco 2026 race: the feed stops after ~20 minutes),
+    the lap is kept and drawn along the session's reference lap; the pit-wall replay does the same.
+  - Known limit: OpenF1 doesn't say when a used tyre set is refitted, so tyre age counts this session's laps.
+- **Lap delta.** Each lap's distance is integrated from its own speed trace, so two laps of the same track
+  end metres apart, and one bad speed sample shifts everything after it. Every compared lap is put on the
+  reference lap's distance scale by matching its positions to the reference lap's path (ignoring position
+  samples that are off the path, run backwards, or disagree by > 25 m), so corners line up for every driver
+  and the delta ends exactly at the official lap-time gap.
 - `backend/service.py` holds the API logic shared by the server and the static build. In the browser it runs
   in a Web Worker on [Pyodide](https://pyodide.org) (Python + numpy + pandas compiled to WebAssembly), so lap
   comparisons are computed by the same code as the server.
@@ -107,8 +136,10 @@ tests/         analysis maths, API, and the FastF1 code path with a fake session
 tools/         bake, check and build the online version
 ```
 
-**Lap delta** — both laps are interpolated onto a shared 5 m distance grid and
-the elapsed times subtracted. Positive = slower than the reference (first driver).
+**Lap delta** — every lap is first put on the reference lap's distance scale (positions matched to the
+reference lap's path, see "Online version"), then both are interpolated onto a shared 5 m grid and the
+elapsed times subtracted. Positive = slower than the reference (the fastest of the chosen laps). The last
+value always equals the official lap-time gap.
 
 **Braking zones** — taken from the brake on/off channel. Signal flicker under
 15 m is merged, blips that don't cost ≥10 km/h are ignored, and the minimum

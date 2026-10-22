@@ -63,6 +63,8 @@ export function renderCards(d) {
       <div class="who"><span class="code">${x.code}</span><span class="name">${esc(x.name)} · ${esc(x.team)}</span></div>
       <div class="time">${fmtLap(x.lap.time)}${tyre}</div>${gap}
       <div class="secs">${secs}</div>
+      ${x.lap.substitute_for ? `<div class="subnote" title="The source's car data for that lap is incomplete">Fastest lap ${esc(x.lap.substitute_for.time_str)} (lap ${x.lap.substitute_for.lap}) has broken telemetry in the source data · showing lap ${x.lap.lap}</div>` : ""}
+      ${x.lap.map === "reference" ? `<div class="subnote" title="Speed, throttle, brake and gears are this lap's own data">Car positions are missing in the source data for this lap · map position follows the session's reference lap</div>` : ""}
       <div class="stats">
         <div class="stat"><span>Top speed</span><b>${s.top_speed}</b><i style="--w:${pct(s.top_speed, 280, 360)}%"></i></div>
         <div class="stat"><span>Full throttle</span><b>${s.full_throttle_pct ?? "—"}%</b><i style="--w:${s.full_throttle_pct ?? 0}%"></i></div>

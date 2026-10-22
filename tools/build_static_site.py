@@ -38,7 +38,12 @@ def build(baked: Path, out: Path, pyodide: str = PYODIDE) -> None:
     shutil.copytree(baked, out / "data")
     (out / ".nojekyll").write_text("")
 
-    sessions = sum(len(e["sessions"]) for evs in json.loads((baked / "manifest.json").read_text())["years"].values() for e in evs)
+    years = json.loads((baked / "manifest.json").read_text())["years"]
+    sessions = sum(len(e["sessions"]) for evs in years.values() for e in evs)
+    per_year = {y: sum(len(e["sessions"]) for e in evs) for y, evs in years.items()}
+    latest = max(years)
+    others = " ".join(f"plus {n} from {y}" for y, n in per_year.items() if y != latest)
+    coverage = f"every {latest} qualifying, sprint and race so far ({per_year[latest]} sessions){', ' + others if others else ''}"
     html = (front / "index.html").read_text()
     cfg = json.dumps({"pyodide": pyodide, "data": "data/", "py": "py/"})
     ld = json.dumps({"@context": "https://schema.org", "@type": "WebApplication", "name": "Pitwall", "url": SITE,
@@ -63,7 +68,7 @@ def build(baked: Path, out: Path, pyodide: str = PYODIDE) -> None:
         ("""  <title>Pitwall Telemetry</title>
   <meta name="description" content="Formula 1 lap telemetry: 3D replay, speed traces, lap delta, braking, corners and track dominance.">""", head),
         ("""<p>Real data comes from the official F1 live-timing feed via FastF1. The first load of a session downloads it (30–60&nbsp;s); after that it is cached on disk.</p>""",
-         f"""<p>Real data from the official F1 timing feed (via FastF1), recorded for {sessions} sessions from 2024 and 2026. Each driver's fastest lap is included, and the analysis runs in your browser. The <a href="https://github.com/Chetan-Payyavula/pitwall">full app on GitHub</a> loads any session, any lap and live timing.</p>"""),
+         f"""<p>Real data from the official F1 timing feed (via OpenF1 and FastF1): {coverage}. Each driver's fastest lap is included, and the analysis runs in your browser. The <a href="https://github.com/Chetan-Payyavula/pitwall">full app on GitHub</a> loads any session, any lap and live timing.</p>"""),
         ("""<footer class="foot">Data: FastF1 / F1 live timing. Unofficial fan project, not associated with Formula 1.</footer>""",
          """<footer class="foot">Data: FastF1 / F1 live timing. Built by <a href="https://chetan-payyavula.github.io/">Chetan Payyavula</a> · <a href="https://github.com/Chetan-Payyavula/pitwall">Code on GitHub</a>. Unofficial fan project, not associated with Formula 1.</footer>"""),
     ]

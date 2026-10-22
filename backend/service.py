@@ -7,7 +7,7 @@ from __future__ import annotations
 from . import data, live_demo, live_sources
 from .livecore import car_window, snapshot
 from .strategy import ers_at, live_strategy
-from .analysis import (add_g_forces, braking_zones, corner_analysis, lap_delta,
+from .analysis import (add_g_forces, align_distance, braking_zones, corner_analysis, lap_delta,
                        lap_summary, match_braking_zones, rotate, to_series, track_dominance)
 
 TRACE_COLS = ["Distance", "Time", "Speed", "Throttle", "Brake", "nGear", "RPM", "DRS", "X", "Y", "Z", "LongG", "LatG"]
@@ -38,13 +38,15 @@ def compare(year: int, event: str, session: str, codes: list[str], laps: list[st
 
     # telemetry for each driver (sessions are cached so this is cheap after the first load)
     results = list(mapper(lambda a: data.lap_telemetry(year, event, session, *a), zip(codes, laps)))
-    tels = {c: add_g_forces(t) for c, (t, _) in zip(codes, results)}
+    raw = {c: t for c, (t, _) in zip(codes, results)}
     infos = {c: i for c, (_, i) in zip(codes, results)}
     # the reference (first) driver is always the fastest of the chosen laps
     lap_of = dict(zip(codes, laps))
     # (officially timed laps rank ahead of untimed ones; ties keep the picked order)
     codes = sorted(codes, key=lambda c: (not infos[c].get("timed", True), infos[c]["time"], codes.index(c)))
     laps = [lap_of[c] for c in codes]
+    # every lap on the reference lap's distance scale, so traces, corners and the delta line up
+    tels = {c: add_g_forces(raw[c] if c == codes[0] else align_distance(raw[c], raw[codes[0]])) for c in codes}
 
     circ = data.circuit(year, event, session)
     rot = circ["rotation"]

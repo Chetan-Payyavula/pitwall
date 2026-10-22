@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import shutil
 from functools import lru_cache
 from pathlib import Path
 
@@ -79,17 +80,32 @@ def _unpack(key: str, v: np.ndarray) -> np.ndarray:
 
 
 # =================================================================== bake (FastF1)
-def bake_session(root, year: int, event: int, session: str) -> dict:
-    """Write one session's files. Returns a summary for the manifest."""
+def bake_session(root, year: int, event: int, session: str, src=None, race_date: str | None = None) -> dict:
+    """Write one session's files. Returns a summary for the manifest.
+
+    `src` = None reads the session through FastF1 (backend.data); otherwise an object with the same
+    methods (drivers, overview, circuit, lap_telemetry, race_data), e.g. backend.openf1_hist.OF1Session.
+    """
     out = session_dir(root, year, event, session)
-    drv = data.drivers(year, str(event), session)
+    if out.exists():
+        shutil.rmtree(out)          # never leave files from an earlier bake behind
+    drv = src.drivers() if src else data.drivers(year, str(event), session)
     _dump(out / "drivers.json", drv)
-    _dump(out / "overview.json", data.overview(year, str(event), session))
-    _dump(out / "circuit.json", data.circuit(year, str(event), session))
+    _dump(out / "overview.json", src.overview(race_date) if src else data.overview(year, str(event), session))
+    _dump(out / "circuit.json", src.circuit() if src else data.circuit(year, str(event), session))
     baked = []
+    limits = src.quality_limits([d["code"] for d in drv["drivers"] if d.get("best") is not None]) \
+        if src is not None and hasattr(src, "quality_limits") else None
     for d in drv["drivers"]:
+        if d.get("best") is None:
+            continue
         try:
-            tel, info = data.lap_telemetry(year, str(event), session, d["code"], "fastest")
+            if src is None:
+                tel, info = data.lap_telemetry(year, str(event), session, d["code"], "fastest")
+            elif hasattr(src, "clean_fastest"):
+                tel, info = src.clean_fastest(d["code"], limits)
+            else:
+                tel, info = src.lap_telemetry(d["code"])
         except data.DataError:
             continue
         cols = [c for c in tel.columns if c not in DROP_COLS]
@@ -97,9 +113,16 @@ def bake_session(root, year: int, event: int, session: str) -> dict:
                    "data": {c: tel[c].tolist() for c in cols}}
         _dump(out / "laps" / f"{d['code']}.json", payload)
         baked.append(d["code"])
+    missing = {d["code"] for d in drv["drivers"] if d.get("best") is not None} - set(baked)
+    if missing:   # a timed driver whose telemetry is unusable in the source: the site greys the chip out
+        ov = json.loads((out / "overview.json").read_text())
+        for r in ov["drivers"]:
+            if r["code"] in missing:
+                r["no_telemetry"] = True
+        _dump(out / "overview.json", ov)
     has_race = False
     if drv["session"] in RACE_NAMES:
-        rd = live_sources.fastf1_race(year, str(event), session)
+        rd = src.race_data() if src else live_sources.fastf1_race(year, str(event), session)
         _dump(out / "race.json", {"name": rd.name, "total_laps": rd.total_laps, "start": rd.start, "end": rd.end,
                                   "drivers": rd.drivers, "laps": rd.laps, "messages": rd.messages, "status": rd.status,
                                   "track": rd.track, "meta": rd.meta})
